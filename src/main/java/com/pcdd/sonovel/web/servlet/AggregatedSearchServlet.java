@@ -9,7 +9,9 @@ import jakarta.servlet.http.HttpServlet;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 
+import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Map;
 
 public class AggregatedSearchServlet extends HttpServlet {
 
@@ -17,7 +19,8 @@ public class AggregatedSearchServlet extends HttpServlet {
     protected void doGet(HttpServletRequest req, HttpServletResponse resp) {
         String name = req.getParameter("kw");
         String searchLimitStr = req.getParameter("searchLimit");
-        List<SearchResult> results = AggregatedSearchAction.getSearchResults(name);
+        AggregatedSearchAction.AggregatedOutcome outcome = AggregatedSearchAction.getSearchOutcome(name);
+        List<SearchResult> results = outcome.getResults();
 
         if (StrUtil.isNotBlank(searchLimitStr)) {
             try {
@@ -34,7 +37,10 @@ public class AggregatedSearchServlet extends HttpServlet {
             }
         }
 
-        RespUtils.writeJson(resp, results);
+        Map<String, Object> data = new LinkedHashMap<>();
+        data.put("results", results);
+        data.put("sourceStatus", outcome.getSourceStatus());
+        RespUtils.writeJson(resp, data);
     }
 
 }
