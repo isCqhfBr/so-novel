@@ -43,8 +43,10 @@ import static org.fusesource.jansi.AnsiRenderer.render;
 public class SearchParser extends Source {
 
     private static final int TEXT_LIMIT_LENGTH = 30;
-    // 触发书源搜索间隔限制时，最多自动等待的秒数
+    // 触发书源搜索间隔限制时，单次最多自动等待的秒数
     private static final long SEARCH_INTERVAL_MAX_WAIT = 30;
+    // 多次重试累计自动等待的上限（秒）：允许在时钟偏差/首次重试仍限流时再重试一次
+    private static final long SEARCH_INTERVAL_TOTAL_MAX_WAIT = 45;
     private final OkHttpClient httpClient = HttpClientContext.get();
 
     // 本次搜索的状态（供聚合搜索逐源回传前端）：ok/empty/timeout/error/interval
@@ -79,19 +81,26 @@ public class SearchParser extends Source {
             Request.Builder builder = buildSearchRequest(r, keyword, searchUrl, referer);
             document = fetchSearchDocument(builder, r, searchUrl);
 
-            // 搜索频率间隔提示（如少年小说网：两次搜索需间隔 N 秒）：等待后重试一次，避免被当成空结果静默丢弃
-            long waitSec = CrawlUtils.detectSearchInterval(document.html());
-            if (waitSec > 0 && waitSec <= SEARCH_INTERVAL_MAX_WAIT) {
-                Console.log("书源 {} ({}) 触发搜索间隔限制，等待 {}s 后重试...",
-                        this.rule.getId(), this.rule.getName(), waitSec);
+            // 搜索频率间隔提示（如少年小说网：两次搜索需间隔 N 秒）：等待后重试，重试后再次检测，
+            // 必要时在累计上限内二次重试，避免被当成空结果静默丢弃（旧逻辑只重试一次，时钟偏差时白等仍 0 结果）
+            long totalWaited = 0;
+            int intervalAttempt = 0;
+            while (true) {
+                long waitSec = CrawlUtils.detectSearchInterval(document.html());
+                if (waitSec <= 0) break;
+                if (waitSec > SEARCH_INTERVAL_MAX_WAIT || totalWaited + waitSec > SEARCH_INTERVAL_TOTAL_MAX_WAIT) {
+                    Console.log("书源 {} ({}) 搜索间隔限制需等待 {}s（超过自动等待上限），本次跳过",
+                            this.rule.getId(), this.rule.getName(), waitSec);
+                    return finish("interval",
+                            StrUtil.format("触发搜索间隔限制，需等待 {}s（超过自动等待上限）", waitSec),
+                            Collections.emptyList(), start);
+                }
+                intervalAttempt++;
+                totalWaited += waitSec;
+                Console.log("书源 {} ({}) 触发搜索间隔限制，第 {} 次等待 {}s 后重试（累计等待 {}s）...",
+                        this.rule.getId(), this.rule.getName(), intervalAttempt, waitSec, totalWaited);
                 Thread.sleep(waitSec * 1000);
                 document = fetchSearchDocument(buildSearchRequest(r, keyword, searchUrl, referer), r, searchUrl);
-            } else if (waitSec > SEARCH_INTERVAL_MAX_WAIT) {
-                Console.log("书源 {} ({}) 搜索间隔限制需等待 {}s（超过上限 {}s），本次跳过",
-                        this.rule.getId(), this.rule.getName(), waitSec, SEARCH_INTERVAL_MAX_WAIT);
-                return finish("interval",
-                        StrUtil.format("触发搜索间隔限制，需等待 {}s（超过自动等待上限 {}s）", waitSec, SEARCH_INTERVAL_MAX_WAIT),
-                        Collections.emptyList(), start);
             }
 
         } catch (Exception e) {

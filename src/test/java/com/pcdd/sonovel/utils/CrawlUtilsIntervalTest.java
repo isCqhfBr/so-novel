@@ -60,4 +60,17 @@ class CrawlUtilsIntervalTest {
                 "unexpected wait seconds: " + wait);
     }
 
+    /** 笔趣阁365 式 alert 提示（无【】、无目标时钟）：alert('搜索间隔15秒,请稍后重新搜索！') → 完整间隔 15+2 */
+    @Test
+    void alertStyleHint_returnsIntervalPlus2() {
+        String html = "<script>alert('搜索间隔15秒,请稍后重新搜索！')</script>";
+        assertEquals(17L, CrawlUtils.detectSearchInterval(html));
+    }
+
+    /** 通用"搜索间隔 N 秒"（无括号、无时钟）：→ N+2 */
+    @Test
+    void genericIntervalHint_returnsIntervalPlus2() {
+        assertEquals(22L, CrawlUtils.detectSearchInterval("<html>搜索间隔20秒，请稍后再试</html>"));
+    }
+
 }
