@@ -321,7 +321,7 @@
             </div>
             <div class="flex items-center gap-1.5 shrink-0">
               <a :href="s.url" target="_blank" rel="noopener" class="p-1.5 text-gray-400 hover:text-primary border border-gray-200 rounded-md inline-flex" x-html="iconExternal" title="打开该书源网站"></a>
-              <button @click="patchSource(s.id, 'ruleDisabled', !s.disabled)"
+              <button @click="toggleSource(s)"
                       class="px-2 py-0.5 rounded text-xs"
                       :class="s.disabled ? 'bg-red-50 text-red-500' : 'bg-green-50 text-green-600'"
                       :title="s.disabled ? '点击启用' : '点击禁用'" x-text="s.disabled ? '已禁用' : '已启用'"></button>

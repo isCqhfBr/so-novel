@@ -200,11 +200,13 @@ function App() {
       this.isSearching = true;
       try {
         const d = await Api.search(v);
-        if (d && d.data) {
+        if (d && d.code === 200 && d.data) {
           this.bookCache = d.data.results || [];
           this.sourceStatuses = d.data.sourceStatus || [];
           this.statusPanelOpen = true;
           this.currentPage = 1;
+        } else {
+          alert('搜索失败: ' + ((d && d.message) || '未知错误'));
         }
       } catch (e) {
         alert('搜索失败: ' + e.message);
@@ -551,6 +553,20 @@ function App() {
       const d = await Api.deleteSource(id);
       if (d.code === 200) await this.fetchSources();
       else alert('删除失败: ' + (d.message || ''));
+    },
+    // 启用/禁用书源：后端写回成功后再本地翻转，保持 UI 与实际状态一致
+    async toggleSource(s) {
+      const next = !s.disabled;
+      try {
+        const d = await Api.patchSource(s.id, 'ruleDisabled', next);
+        if (d && d.code === 200) {
+          s.disabled = next;
+        } else {
+          alert('操作失败: ' + ((d && d.message) || '未知错误'));
+        }
+      } catch (e) {
+        alert('操作失败: ' + e.message);
+      }
     },
     emptyRule() {
       return {
